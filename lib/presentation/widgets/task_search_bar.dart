@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class TaskSearchBar extends StatelessWidget {
+class TaskSearchBar extends StatefulWidget {
   final String searchQuery;
   final Function(String) onChanged;
   final VoidCallback onClear;
@@ -13,6 +13,25 @@ class TaskSearchBar extends StatelessWidget {
   });
 
   @override
+  _TaskSearchBarState createState() => _TaskSearchBarState();
+}
+
+class _TaskSearchBarState extends State<TaskSearchBar> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -21,16 +40,20 @@ class TaskSearchBar extends StatelessWidget {
           hintText: 'Search tasks...',
           prefixIcon: const Icon(Icons.search),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          suffixIcon:
-              searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: onClear,
-                  )
-                  : null,
+          suffixIcon: _controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onClear();
+                  },
+                )
+              : null,
         ),
-        onChanged: onChanged,
-        controller: TextEditingController(text: searchQuery),
+        onChanged: (value) {
+          widget.onChanged(value);
+        },
+        controller: _controller,
       ),
     );
   }

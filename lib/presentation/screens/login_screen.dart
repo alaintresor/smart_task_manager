@@ -126,11 +126,7 @@ class LoginScreen extends StatelessWidget {
                 // Google sign in button
                 OutlinedButton.icon(
                   onPressed: () {},
-                  icon: Image.network(
-                    'https://image.similarpng.com/file/similarpng/very-thumbnail/2020/06/Logo-google-icon-PNG.png',
-                    height: 24,
-                    width: 24,
-                  ),
+                  icon: Image.asset('assets/images/google.png', height: 24, width: 24),
                   label: Text(
                     'Continue with Google',
                     style: TextStyle(fontSize: 16, color: Colors.grey[800]),
