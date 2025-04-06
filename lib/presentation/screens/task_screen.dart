@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_task_manager/data/models/task.dart';
 import 'package:smart_task_manager/data/providers/task_notifier.dart';
 import 'package:smart_task_manager/data/providers/auth_provider.dart';
-import 'package:smart_task_manager/data/repositories/task_repositiry.dart';
 import 'package:smart_task_manager/presentation/widgets/active_filter_bar.dart';
 import 'package:smart_task_manager/presentation/widgets/empty_tasks_placeholder.dart';
 import 'package:smart_task_manager/presentation/widgets/filter_bottom_sheet.dart';
@@ -128,11 +127,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         task: task,
         onSave: (title, description, priority, dueDate) async {
           final taskNotifier = ref.read(taskNotifierProvider.notifier);
-          final asyncTasks = ref.read(taskNotifierProvider);
+          ref.read(taskNotifierProvider);
           final user = ref.read(authStateChangesProvider).value;
           
           if (user == null) return;
-          
           if (task != null) {
             // Update existing task
             final updatedTask = task.copyWith(
@@ -282,13 +280,6 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilterBottomSheet,
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            tooltip: 'Test Notifications',
-            onPressed: () {
-              Navigator.of(context).pushNamed('/notification_test');
-            },
           ),
           IconButton(
             icon: _getThemeIcon(),

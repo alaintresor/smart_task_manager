@@ -109,7 +109,6 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateChangesProvider);
-
     return MaterialApp(
       title: 'Smart Task Manager',
       debugShowCheckedModeBanner: false,

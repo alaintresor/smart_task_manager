@@ -17,7 +17,13 @@ class NotificationService {
     try {
       debugPrint('Initializing notification service...');
       tz.initializeTimeZones();
-      tz.setLocalLocation(tz.getLocation('UTC')); // Set a default timezone
+      // Use local timezone instead of UTC for better scheduling accuracy
+      try {
+        tz.setLocalLocation(tz.getLocation('America/New_York')); // You should replace this with dynamic timezone detection
+      } catch (e) {
+        // Fallback to UTC if local timezone is not available
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
 
       final androidSettings = const AndroidInitializationSettings('@mipmap/ic_launcher');
       final iosSettings = DarwinInitializationSettings(
@@ -34,6 +40,9 @@ class NotificationService {
         iOS: iosSettings,
       );
 
+      // Set initialization flag before actual initialization to prevent race conditions
+      _initialized = true;
+
       await _notifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
@@ -42,7 +51,6 @@ class NotificationService {
       );
       
       debugPrint('Notification service initialized successfully');
-      _initialized = true;
       
       // Check and request permissions
       if (Platform.isAndroid) {
@@ -51,6 +59,8 @@ class NotificationService {
         await _requestIOSPermissions();
       }
     } catch (e) {
+      // Reset initialization flag if initialization fails
+      _initialized = false;
       debugPrint('Error initializing notification service: $e');
       rethrow;
     }
@@ -77,20 +87,25 @@ class NotificationService {
       }
     } catch (e) {
       debugPrint('Error requesting Android permissions: $e');
-      rethrow;
+      // Don't rethrow here to prevent app crashes during permission request
+      // Instead, log the error and continue
     }
   }
 
   static Future<bool> checkExactAlarmPermission() async {
     if (!Platform.isAndroid) return true;
     
-    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        _notifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-            
-    if (androidImplementation != null) {
-      final bool? hasExactAlarms = await androidImplementation.canScheduleExactNotifications();
-      return hasExactAlarms ?? false;
+    try {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+              
+      if (androidImplementation != null) {
+        final bool? hasExactAlarms = await androidImplementation.canScheduleExactNotifications();
+        return hasExactAlarms ?? false;
+      }
+    } catch (e) {
+      debugPrint('Error checking exact alarm permission: $e');
     }
     return false;
   }
@@ -111,7 +126,7 @@ class NotificationService {
       }
     } catch (e) {
       debugPrint('Error requesting iOS permissions: $e');
-      rethrow;
+      // Don't rethrow here to prevent app crashes during permission request
     }
   }
 
@@ -119,6 +134,7 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
+    String? payload,
   }) async {
     if (!_initialized) {
       debugPrint('NotificationService not initialized, initializing now...');
@@ -148,11 +164,11 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      await _notifications.show(id, title, body, details);
+      await _notifications.show(id, title, body, details, payload: payload);
       debugPrint('Notification shown successfully');
     } catch (e) {
       debugPrint('Error showing notification: $e');
-      rethrow;
+      // Log error but don't rethrow to prevent app crashes
     }
   }
 
@@ -178,6 +194,7 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime dateTime,
+    String? payload,
   }) async {
     if (!_initialized) {
       debugPrint('NotificationService not initialized, initializing now...');
@@ -187,6 +204,13 @@ class NotificationService {
     try {
       debugPrint('Scheduling notification: $id, $title, $body at $dateTime');
       
+      // Ensure the scheduled time is in the future
+      final now = DateTime.now();
+      if (dateTime.isBefore(now)) {
+        debugPrint('Warning: Scheduled time is in the past, adjusting to now + 5 seconds');
+        dateTime = now.add(const Duration(seconds: 5));
+      }
+      
       // Check if we have exact alarm permission on Android
       if (Platform.isAndroid) {
         final hasExactAlarms = await checkExactAlarmPermission();
@@ -195,7 +219,9 @@ class NotificationService {
           final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
               _notifications.resolvePlatformSpecificImplementation<
                   AndroidFlutterLocalNotificationsPlugin>();
-          await androidImplementation?.requestExactAlarmsPermission();
+          if (androidImplementation != null) {
+            await androidImplementation.requestExactAlarmsPermission();
+          }
         }
       }
       
@@ -221,42 +247,26 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      final scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
+      // Get current timezone
+      tz.TZDateTime scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
       debugPrint('Scheduling for: $scheduledDate');
       
-      // Use a simpler approach for debugging
-      if (dateTime.difference(DateTime.now()).inSeconds <= 60) {
-        // For short time differences (<=60 seconds), use a simpler approach
-        debugPrint('Using simple schedule approach for short interval');
-        
-        // Use direct timing approach for short intervals
-        await _notifications.zonedSchedule(
-          id,
-          title,
-          body,
-          scheduledDate,
-          details,
-          uiLocalNotificationDateInterpretation: 
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      } else {
-        // For longer time differences, use a more reliable approach
-        debugPrint('Using exact schedule approach for longer interval');
-        
-        // Calculate seconds from now
-        final int secondsFromNow = dateTime.difference(DateTime.now()).inSeconds;
-        debugPrint('Scheduling notification in $secondsFromNow seconds from now');
-        
-        await _notifications.zonedSchedule(
-          id,
-          title,
-          body,
-          tz.TZDateTime.now(tz.local).add(Duration(seconds: secondsFromNow)),
-          details,
-          uiLocalNotificationDateInterpretation: 
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      }
+      // Calculate seconds from now
+      final int secondsFromNow = dateTime.difference(now).inSeconds;
+      debugPrint('Scheduling notification in $secondsFromNow seconds from now');
+      
+      // Use zonedSchedule with the correctly formatted TZDateTime
+      await _notifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidAllowWhileIdle: true, // Allow notification when device is in low-power idle modes
+        uiLocalNotificationDateInterpretation: 
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
       
       // Verify the notification was scheduled
       await Future.delayed(const Duration(milliseconds: 500));
@@ -268,7 +278,7 @@ class NotificationService {
       }
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
-      rethrow;
+      // Log error but don't rethrow to prevent app crashes during scheduling
     }
   }
 
@@ -279,7 +289,17 @@ class NotificationService {
       debugPrint('Notification cancelled successfully');
     } catch (e) {
       debugPrint('Error cancelling notification: $e');
-      rethrow;
+      // Log error but don't rethrow to prevent app crashes
+    }
+  }
+
+  static Future<void> cancelAll() async {
+    try {
+      debugPrint('Cancelling all notifications');
+      await _notifications.cancelAll();
+      debugPrint('All notifications cancelled successfully');
+    } catch (e) {
+      debugPrint('Error cancelling all notifications: $e');
     }
   }
 }
