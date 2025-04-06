@@ -1,26 +1,51 @@
 {
   "project_info": {
-    "project_number": "852142063391",
-    "project_id": "smart-task-manager-5a73a",
-    "storage_bucket": "smart-task-manager-5a73a.firebasestorage.app"
+    "project_number": "1092400608704",
+    "project_id": "test-5d050",
+    "storage_bucket": "test-5d050.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:852142063391:android:d9a0fb39e1d58134947a2a",
+        "mobilesdk_app_id": "1:1092400608704:android:a4f1500117ab51c1820425",
         "android_client_info": {
           "package_name": "com.example.smart_task_manager"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1092400608704-e7oh9nm3td50uehj7507h59m32aop17l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smart_task_manager",
+            "certificate_hash": "5aff3c34706864d1cf71d3b4b5eb66832c87647c"
+          }
+        },
+        {
+          "client_id": "1092400608704-sn1nsfg2phvl5ibhlb6ea9dgkrs7rtf8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyA7KMN-PCIBq0TaMtVlHC7s8K2fO68BqWA"
+          "current_key": "AIzaSyDFd47A-dY27aQNrqv_XJwa-BACqKyZ5_0"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1092400608704-sn1nsfg2phvl5ibhlb6ea9dgkrs7rtf8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1092400608704-nbbiieko3tfkkv419q0m0cj353k0fqv8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smartTaskManager"
+              }
+            }
+          ]
         }
       }
     }
