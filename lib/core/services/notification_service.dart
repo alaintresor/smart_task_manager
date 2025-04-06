@@ -156,6 +156,23 @@ class NotificationService {
     }
   }
 
+  static Future<List<PendingNotificationRequest>> checkPendingNotifications() async {
+    try {
+      if (!_initialized) {
+        await init();
+      }
+      final pendingNotifications = await _notifications.pendingNotificationRequests();
+      debugPrint('Pending notifications: ${pendingNotifications.length}');
+      for (var notification in pendingNotifications) {
+        debugPrint('Pending notification: id=${notification.id}, title=${notification.title}, body=${notification.body}');
+      }
+      return pendingNotifications;
+    } catch (e) {
+      debugPrint('Error checking pending notifications: $e');
+      return [];
+    }
+  }
+
   static Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -207,18 +224,48 @@ class NotificationService {
       final scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
       debugPrint('Scheduling for: $scheduledDate');
       
-      await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledDate,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
+      // Use a simpler approach for debugging
+      if (dateTime.difference(DateTime.now()).inSeconds <= 60) {
+        // For short time differences (<=60 seconds), use a simpler approach
+        debugPrint('Using simple schedule approach for short interval');
+        
+        // Use direct timing approach for short intervals
+        await _notifications.zonedSchedule(
+          id,
+          title,
+          body,
+          scheduledDate,
+          details,
+          uiLocalNotificationDateInterpretation: 
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } else {
+        // For longer time differences, use a more reliable approach
+        debugPrint('Using exact schedule approach for longer interval');
+        
+        // Calculate seconds from now
+        final int secondsFromNow = dateTime.difference(DateTime.now()).inSeconds;
+        debugPrint('Scheduling notification in $secondsFromNow seconds from now');
+        
+        await _notifications.zonedSchedule(
+          id,
+          title,
+          body,
+          tz.TZDateTime.now(tz.local).add(Duration(seconds: secondsFromNow)),
+          details,
+          uiLocalNotificationDateInterpretation: 
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      }
       
-      debugPrint('Notification scheduled successfully');
+      // Verify the notification was scheduled
+      await Future.delayed(const Duration(milliseconds: 500));
+      final pendingNotifications = await checkPendingNotifications();
+      if (pendingNotifications.any((notification) => notification.id == id)) {
+        debugPrint('✅ Notification scheduled successfully and verified');
+      } else {
+        debugPrint('❌ Failed to verify scheduled notification');
+      }
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
       rethrow;

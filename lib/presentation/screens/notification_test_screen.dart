@@ -4,7 +4,7 @@ import 'package:smart_task_manager/core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationTestScreen extends StatefulWidget {
-  const NotificationTestScreen({Key? key}) : super(key: key);
+  const NotificationTestScreen({super.key});
 
   @override
   State<NotificationTestScreen> createState() => _NotificationTestScreenState();

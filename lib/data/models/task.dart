@@ -47,6 +47,7 @@ class Task {
       };
 
   Task copyWith({
+    String? id,
     String? title,
     String? description,
     Priority? priority,
@@ -55,7 +56,7 @@ class Task {
     String? userId,
   }) {
     return Task(
-      id: id,
+      id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       priority: priority ?? this.priority,
@@ -66,9 +67,9 @@ class Task {
   }
 }
 
-
-// Enum for Priority levels
-
+extension TaskCompletion on Task {
+  bool get isCompleted => status == TaskStatus.completed;
+}
 
 extension PriorityColor on Priority {
   Color get color {
