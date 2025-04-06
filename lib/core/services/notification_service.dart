@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -34,10 +35,17 @@ class NotificationService {
           debugPrint('Received iOS notification: $id, $title, $body, $payload');
         },
       );
+
+      if(kIsWeb){
+        // Web-specific initialization
+    
+        return;
+      }
       
       final initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
+        
       );
 
       // Set initialization flag before actual initialization to prevent race conditions
