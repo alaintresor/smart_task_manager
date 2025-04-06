@@ -134,6 +134,7 @@ class NotificationService {
         channelDescription: 'Reminder notifications for tasks',
         importance: Importance.max,
         priority: Priority.high,
+        playSound: true,
       );
       
       const iosDetails = DarwinNotificationDetails(
@@ -181,12 +182,15 @@ class NotificationService {
         }
       }
       
-      const androidDetails = AndroidNotificationDetails(
+      final androidDetails = const AndroidNotificationDetails(
         'task_channel',
         'Task Reminders',
         channelDescription: 'Reminder notifications for tasks',
         importance: Importance.max,
         priority: Priority.high,
+        playSound: true,
+        enableLights: true,
+        fullScreenIntent: true,
       );
       
       const iosDetails = DarwinNotificationDetails(
@@ -195,7 +199,7 @@ class NotificationService {
         presentSound: true,
       );
       
-      const details = NotificationDetails(
+      final details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );

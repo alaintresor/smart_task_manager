@@ -1,24 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:smart_task_manager/core/services/background_service.dart';
+import 'package:smart_task_manager/core/services/firebase_service.dart';
+import 'package:smart_task_manager/core/services/notification_service.dart';
+import 'package:smart_task_manager/data/providers/auth_provider.dart';
 import 'package:smart_task_manager/presentation/screens/login_screen.dart';
+import 'package:smart_task_manager/presentation/screens/notification_test_screen.dart';
 import 'package:smart_task_manager/presentation/screens/signup_screen.dart';
 import 'package:smart_task_manager/presentation/screens/task_screen.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+// import 'package:workmanager/workmanager.dart';
 
+// Global navigator key to access context from outside of build
+final globalNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseService.initialize();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-);
-  
   // Load saved theme preference
   final prefs = await SharedPreferences.getInstance();
   final savedThemeMode = prefs.getString('themeMode') ?? 'system';
-  
-  runApp(MyApp(initialThemeMode: _stringToThemeMode(savedThemeMode)));
+
+  await NotificationService.init();
+
+  // Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+
+  // // Run every 15 mins (min allowed on Android)
+  // Workmanager().registerPeriodicTask(
+  //   'check-tasks-periodic',
+  //   checkTasksBackgroundTask,
+  //   frequency: const Duration(minutes: 15),
+  //   constraints: Constraints(networkType: NetworkType.connected),
+  // );
+
+  runApp(
+    ProviderScope(
+      child: MyApp(initialThemeMode: _stringToThemeMode(savedThemeMode)),
+    ),
+  );
 }
 
 // Helper function to convert string to ThemeMode
@@ -34,35 +54,35 @@ ThemeMode _stringToThemeMode(String themeMode) {
   }
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends ConsumerStatefulWidget {
   final ThemeMode initialThemeMode;
-  
+
   const MyApp({super.key, this.initialThemeMode = ThemeMode.system});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> {
   late ThemeMode _themeMode;
-  
+
   @override
   void initState() {
     super.initState();
     _themeMode = widget.initialThemeMode;
   }
-  
+
   // Change the app theme and save preference
   Future<void> _changeTheme(ThemeMode themeMode) async {
     setState(() {
       _themeMode = themeMode;
     });
-    
+
     // Save theme preference
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('themeMode', _themeModeToString(themeMode));
   }
-  
+
   // Helper function to convert ThemeMode to string
   String _themeModeToString(ThemeMode themeMode) {
     switch (themeMode) {
@@ -71,16 +91,30 @@ class _MyAppState extends State<MyApp> {
       case ThemeMode.dark:
         return 'dark';
       case ThemeMode.system:
-      return 'system';
+        return 'system';
+    }
+  }
+
+  // Helper method to handle logout
+  Future<void> _handleLogout() async {
+    await ref.read(authRepositoryProvider).logout();
+    if (mounted) {
+      globalNavigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateChangesProvider);
+
     return MaterialApp(
       title: 'Smart Task Manager',
       debugShowCheckedModeBanner: false,
-      
+      navigatorKey: globalNavigatorKey,
+
       // Light theme configuration
       theme: ThemeData(
         brightness: Brightness.light,
@@ -119,7 +153,7 @@ class _MyAppState extends State<MyApp> {
           elevation: 2,
         ),
       ),
-      
+
       // Dark theme configuration
       darkTheme: ThemeData(
         brightness: Brightness.dark,
@@ -158,33 +192,39 @@ class _MyAppState extends State<MyApp> {
           color: Colors.grey[850],
         ),
       ),
-      
+
       // Current theme mode (system, light, or dark)
       themeMode: _themeMode,
-      
-      initialRoute: '/login',
+
+      home: authState.when(
+        data:
+            (user) =>
+                user != null
+                    ? TaskScreen(
+                      onThemeChanged: _changeTheme,
+                      currentThemeMode: _themeMode,
+                      onLogout: _handleLogout,
+                    )
+                    : const LoginScreen(),
+        loading:
+            () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+        error:
+            (error, stack) =>
+                Scaffold(body: Center(child: Text('Error: $error'))),
+      ),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
-        '/task': (context) => _buildTaskScreen(),
+        '/task':
+            (context) => TaskScreen(
+              onThemeChanged: _changeTheme,
+              currentThemeMode: _themeMode,
+              onLogout: _handleLogout,
+            ),
+        '/notification_test': (context) => const NotificationTestScreen(),
       },
     );
   }
-  
-  // Helper method to build TaskScreen with theme change callback
-  Widget _buildTaskScreen() {
-    return TaskScreen(
-      onThemeChanged: _changeTheme,
-      currentThemeMode: _themeMode,
-      onLogout: () {
-        Navigator.of(_globalNavigatorKey.currentContext!).pushNamedAndRemoveUntil(
-          '/login',
-          (route) => false,
-        );
-      },
-    );
-  }
-  
-  // Global navigator key to access context from outside of build
-  static final GlobalKey<NavigatorState> _globalNavigatorKey = GlobalKey<NavigatorState>();
 }
