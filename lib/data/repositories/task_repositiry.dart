@@ -16,26 +16,15 @@ class TaskRepository {
   /// Adds a new task to Firestore and schedules a notification if needed
   Future<void> addTask(Task task) async {
     try {
-      debugPrint('TaskRepository: Adding task to Firestore: ${task.title}');
-      
-      // Add task to Firestore
-      final docRef = await _taskCollection.add(task.toJson());
-      debugPrint('TaskRepository: Task added with ID: ${docRef.id}');
-      
-      // Since the Firestore ID is generated after adding the document,
-      // update the task with this ID if needed
-      if (task.id.isEmpty) {
-        final updatedTask = task.copyWith(id: docRef.id);
-        await docRef.update({'id': docRef.id});
-        debugPrint('TaskRepository: Updated task with Firestore ID');
-        
-        // Schedule notification only if the task has a future due date
-        await _scheduleTaskNotification(updatedTask);
-      } else {
-        await _scheduleTaskNotification(task);
-      }
+      // Create a new document reference with an auto-generated ID
+      final docRef = _taskCollection.doc();
+      // Create the task with the Firestore ID
+      final taskWithId = task.copyWith(id: docRef.id);
+      // Set the document with the task data
+      await docRef.set(taskWithId.toJson());
+      // Schedule notification
+      await _scheduleTaskNotification(taskWithId);
     } catch (e) {
-      debugPrint('TaskRepository: Error adding task: $e');
       throw _handleException('Error adding task', e);
     }
   }

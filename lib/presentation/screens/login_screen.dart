@@ -104,6 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       _showSuccessSnackBar('Google sign-in successful!');
+       Navigator.pushNamedAndRemoveUntil(context, '/task', (route) => false);
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {

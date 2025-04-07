@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -24,14 +23,20 @@ class AuthRepository {
   Future<void> logout() async {
     // logs
     await _auth.signOut();
-    print('User logged out');
   }
 
   Future<UserCredential> signInWithGoogle() async {
     try {
-      final googleUser = await GoogleSignIn().signIn();
+      // Configure sign-in
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: [
+          'email',
+          'https://www.googleapis.com/auth/userinfo.profile',
+        ],
+      );
+
+      final googleUser = await googleSignIn.signIn();
       
-      // If the user cancels the sign-in process
       if (googleUser == null) {
         throw FirebaseAuthException(
           code: 'ERROR_ABORTED_BY_USER',
@@ -41,10 +46,18 @@ class AuthRepository {
       
       final googleAuth = await googleUser.authentication;
 
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+
+      if (googleAuth.accessToken == null) {
         throw FirebaseAuthException(
-          code: 'ERROR_MISSING_GOOGLE_AUTH_TOKEN',
-          message: 'Missing Google Auth Token',
+          code: 'ERROR_MISSING_ACCESS_TOKEN',
+          message: 'Missing Google Access Token',
+        );
+      }
+
+      if (googleAuth.idToken == null) {
+        throw FirebaseAuthException(
+          code: 'ERROR_MISSING_ID_TOKEN',
+          message: 'Missing Google ID Token',
         );
       }
 

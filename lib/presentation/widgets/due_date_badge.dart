@@ -13,20 +13,23 @@ class DueDateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isPastDue = dueDate.isBefore(DateTime.now());
+    final Color textColor = isPastDue ? Colors.red : Colors.grey;
+    
     return Row(
       children: [
         Icon(
           Icons.calendar_today,
           size: 14,
-          color: isOverdue ? Colors.red : Colors.grey,
+          color: textColor,
         ),
         const SizedBox(width: 4),
         Text(
           DateFormat('MMM dd, yyyy').format(dueDate),
           style: TextStyle(
             fontSize: 12,
-            color: isOverdue ? Colors.red : Colors.grey,
-            fontWeight: isOverdue ? FontWeight.bold : null,
+            color: textColor,
+            fontWeight: isPastDue ? FontWeight.bold : null,
           ),
         ),
       ],

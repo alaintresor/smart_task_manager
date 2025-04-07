@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_task_manager/data/models/task.dart';
 import 'package:smart_task_manager/data/providers/auth_provider.dart';
@@ -7,9 +9,23 @@ import 'package:flutter/foundation.dart';
 class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
   final TaskRepository repository;
   final Ref ref;
+  StreamSubscription? _authSubscription;
+  StreamSubscription? _tasksSubscription;
 
   TaskNotifier(this.repository, this.ref) : super(const AsyncValue.loading()) {
-    _loadTasks();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    // Cancel any existing subscriptions
+    _authSubscription?.cancel();
+    _tasksSubscription?.cancel();
+    
+    // Listen for auth state changes
+    _authSubscription = ref.read(authStateChangesProvider.stream).listen((user) {
+      debugPrint('TaskNotifier: Auth state changed, user: ${user?.uid ?? 'null'}');
+      _loadTasks();
+    });
   }
 
   void _loadTasks() {
@@ -20,8 +36,11 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
       return;
     }
 
+    // Cancel any existing task subscription
+    _tasksSubscription?.cancel();
+    
     debugPrint('TaskNotifier: Loading tasks for user ${user.uid}');
-    repository.watchTasksForUser(user.uid).listen((tasks) {
+    _tasksSubscription = repository.watchTasksForUser(user.uid).listen((tasks) {
       debugPrint('TaskNotifier: Loaded ${tasks.length} tasks');
       state = AsyncValue.data(tasks);
     }, onError: (e, st) {
@@ -61,6 +80,13 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
       debugPrint('TaskNotifier: Error deleting task: $e');
       state = AsyncValue.error(e, st);
     }
+  }
+  
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _tasksSubscription?.cancel();
+    super.dispose();
   }
 }
 
