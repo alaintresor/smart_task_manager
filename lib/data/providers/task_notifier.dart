@@ -21,32 +21,52 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     _authSubscription?.cancel();
     _tasksSubscription?.cancel();
     
+    debugPrint('TaskNotifier: Setting up auth listener');
+    
     // Listen for auth state changes
     _authSubscription = ref.read(authStateChangesProvider.stream).listen((user) {
       debugPrint('TaskNotifier: Auth state changed, user: ${user?.uid ?? 'null'}');
       _loadTasks();
+    }, onError: (e) {
+      debugPrint('TaskNotifier: Error in auth stream: $e');
+      state = AsyncValue.error(e, StackTrace.current);
     });
   }
 
   void _loadTasks() {
-    final user = ref.read(authStateChangesProvider).value;
-    if (user == null) {
-      debugPrint('TaskNotifier: No authenticated user found');
-      state = const AsyncValue.data([]);
-      return;
-    }
+    try {
+      final user = ref.read(authStateChangesProvider).value;
+      if (user == null) {
+        debugPrint('TaskNotifier: No authenticated user found when loading tasks');
+        state = const AsyncValue.data([]);
+        return;
+      }
 
-    // Cancel any existing task subscription
-    _tasksSubscription?.cancel();
-    
-    debugPrint('TaskNotifier: Loading tasks for user ${user.uid}');
-    _tasksSubscription = repository.watchTasksForUser(user.uid).listen((tasks) {
-      debugPrint('TaskNotifier: Loaded ${tasks.length} tasks');
-      state = AsyncValue.data(tasks);
-    }, onError: (e, st) {
-      debugPrint('TaskNotifier: Error loading tasks: $e');
+      // Cancel any existing task subscription
+      _tasksSubscription?.cancel();
+      
+      debugPrint('TaskNotifier: Loading tasks for user ${user.uid}');
+      
+      // Set loading state temporarily
+      state = const AsyncValue.loading();
+      
+      _tasksSubscription = repository.watchTasksForUser(user.uid).listen((tasks) {
+        debugPrint('TaskNotifier: Loaded ${tasks.length} tasks');
+        state = AsyncValue.data(tasks);
+      }, onError: (e, st) {
+        debugPrint('TaskNotifier: Error loading tasks: $e');
+        state = AsyncValue.error(e, st);
+      });
+    } catch (e, st) {
+      debugPrint('TaskNotifier: Unexpected error in _loadTasks: $e');
       state = AsyncValue.error(e, st);
-    });
+    }
+  }
+
+  // Public method to reload tasks on demand
+  void reloadTasks() {
+    debugPrint('TaskNotifier: Manually reloading tasks');
+    _loadTasks();
   }
 
   Future<void> addTask(Task task) async {

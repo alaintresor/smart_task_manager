@@ -36,7 +36,8 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   @override
   void initState() {
     super.initState();
-    _updateFilteredTasks();
+    // Explicitly trigger task loading when the screen initializes
+    _triggerTaskLoading();
   }
 
   @override
@@ -45,38 +46,53 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     _updateFilteredTasks();
   }
 
+  // Method to explicitly trigger task loading
+  void _triggerTaskLoading() {
+    final taskNotifier = ref.read(taskNotifierProvider.notifier);
+    // Force reload tasks
+    taskNotifier.reloadTasks();
+    // Update filtered tasks once data is available
+    _updateFilteredTasks();
+  }
+
   // Update filtered tasks based on current filters
   void _updateFilteredTasks() {
     final asyncTasks = ref.read(taskNotifierProvider);
-    
+
     asyncTasks.whenData((tasks) {
       setState(() {
         _filteredTasks = _filterTasks(tasks);
       });
     });
   }
-  
+
   // Filter tasks based on criteria
   List<Task> _filterTasks(List<Task> tasks) {
     return tasks.where((task) {
       // Filter by search query
-      final matchesQuery = _searchQuery.isEmpty ||
+      final matchesQuery =
+          _searchQuery.isEmpty ||
           task.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           task.description.toLowerCase().contains(_searchQuery.toLowerCase());
-      
+
       // Filter by priority
-      final matchesPriority = _selectedPriority == null || task.priority == _selectedPriority;
-      
+      final matchesPriority =
+          _selectedPriority == null || task.priority == _selectedPriority;
+
       // Filter by status
-      final matchesStatus = _selectedStatus == null || 
-          (_selectedStatus! ? task.status == TaskStatus.completed : task.status != TaskStatus.completed);
-      
+      final matchesStatus =
+          _selectedStatus == null ||
+          (_selectedStatus!
+              ? task.status == TaskStatus.completed
+              : task.status != TaskStatus.completed);
+
       // Filter by due date
-      final matchesDueDate = _selectedDueDate == null ||
+      final matchesDueDate =
+          _selectedDueDate == null ||
           (task.dueDate.year == _selectedDueDate!.year &&
-           task.dueDate.month == _selectedDueDate!.month &&
-           task.dueDate.day == _selectedDueDate!.day);
-      
+              task.dueDate.month == _selectedDueDate!.month &&
+              task.dueDate.day == _selectedDueDate!.day);
+
       return matchesQuery && matchesPriority && matchesStatus && matchesDueDate;
     }).toList();
   }
@@ -96,17 +112,16 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   Future<void> _toggleTaskStatus(String taskId) async {
     final taskNotifier = ref.read(taskNotifierProvider.notifier);
     final asyncTasks = ref.read(taskNotifierProvider);
-    
+
     asyncTasks.whenData((tasks) {
       final taskToUpdate = tasks.firstWhere((task) => task.id == taskId);
-      final newStatus = taskToUpdate.status == TaskStatus.completed 
-                       ? TaskStatus.pending 
-                       : TaskStatus.completed;
-      
-      final updatedTask = taskToUpdate.copyWith(
-        status: newStatus
-      );
-      
+      final newStatus =
+          taskToUpdate.status == TaskStatus.completed
+              ? TaskStatus.pending
+              : TaskStatus.completed;
+
+      final updatedTask = taskToUpdate.copyWith(status: newStatus);
+
       taskNotifier.updateTask(updatedTask);
       _updateFilteredTasks();
     });
@@ -123,40 +138,41 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   void _addOrEditTask({Task? task}) {
     showDialog(
       context: context,
-      builder: (context) => TaskFormDialog(
-        task: task,
-        onSave: (title, description, priority, dueDate) async {
-          final taskNotifier = ref.read(taskNotifierProvider.notifier);
-          ref.read(taskNotifierProvider);
-          final user = ref.read(authStateChangesProvider).value;
-          
-          if (user == null) return;
-          if (task != null) {
-            // Update existing task
-            final updatedTask = task.copyWith(
-              title: title,
-              description: description,
-              priority: priority,
-              dueDate: dueDate,
-            );
-            await taskNotifier.updateTask(updatedTask);
-          } else {
-            // Add new task
-            final newTask = Task(
-              id: '', // This will be replaced by Firestore
-              title: title,
-              description: description,
-              priority: priority,
-              status: TaskStatus.pending,
-              dueDate: dueDate,
-              userId: user.uid,
-            );
-            await taskNotifier.addTask(newTask);
-          }
-          
-          _updateFilteredTasks();
-        },
-      ),
+      builder:
+          (context) => TaskFormDialog(
+            task: task,
+            onSave: (title, description, priority, dueDate) async {
+              final taskNotifier = ref.read(taskNotifierProvider.notifier);
+              ref.read(taskNotifierProvider);
+              final user = ref.read(authStateChangesProvider).value;
+
+              if (user == null) return;
+              if (task != null) {
+                // Update existing task
+                final updatedTask = task.copyWith(
+                  title: title,
+                  description: description,
+                  priority: priority,
+                  dueDate: dueDate,
+                );
+                await taskNotifier.updateTask(updatedTask);
+              } else {
+                // Add new task
+                final newTask = Task(
+                  id: '', // This will be replaced by Firestore
+                  title: title,
+                  description: description,
+                  priority: priority,
+                  status: TaskStatus.pending,
+                  dueDate: dueDate,
+                  userId: user.uid,
+                );
+                await taskNotifier.addTask(newTask);
+              }
+
+              _updateFilteredTasks();
+            },
+          ),
     );
   }
 
@@ -167,19 +183,20 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => FilterBottomSheet(
-        initialPriority: _selectedPriority,
-        initialStatus: _selectedStatus,
-        initialDueDate: _selectedDueDate,
-        onApplyFilters: (priority, status, dueDate) {
-          setState(() {
-            _selectedPriority = priority;
-            _selectedStatus = status;
-            _selectedDueDate = dueDate;
-          });
-          _updateFilteredTasks();
-        },
-      ),
+      builder:
+          (context) => FilterBottomSheet(
+            initialPriority: _selectedPriority,
+            initialStatus: _selectedStatus,
+            initialDueDate: _selectedDueDate,
+            onApplyFilters: (priority, status, dueDate) {
+              setState(() {
+                _selectedPriority = priority;
+                _selectedStatus = status;
+                _selectedDueDate = dueDate;
+              });
+              _updateFilteredTasks();
+            },
+          ),
     );
   }
 
@@ -187,25 +204,26 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   void _confirmLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Logout'),
+            content: const Text('Are you sure you want to logout?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  if (widget.onLogout != null) {
+                    widget.onLogout!();
+                  }
+                },
+                child: const Text('Logout'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              if (widget.onLogout != null) {
-                widget.onLogout!();
-              }
-            },
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -272,7 +290,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         });
       });
     });
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Task Manager'),
@@ -338,19 +356,41 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
 
           // Task list component with loading state handling
           Expanded(
-            child: ref.watch(taskNotifierProvider).when(
-              data: (tasks) => _filteredTasks.isEmpty
-                  ? const EmptyTasksPlaceholder()
-                  : TaskList(
-                      tasks: _filteredTasks,
-                      onToggleStatus: _toggleTaskStatus,
-                      onEdit: (task) => _addOrEditTask(task: task),
-                      onDelete: _deleteTask,
-                    ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stackTrace) => Center(
-                child: Text('Error: ${error.toString()}'),
-              ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _triggerTaskLoading();
+              },
+              child: ref
+                  .watch(taskNotifierProvider)
+                  .when(
+                    data:
+                        (tasks) =>
+                            _filteredTasks.isEmpty
+                                ? const EmptyTasksPlaceholder()
+                                : TaskList(
+                                  tasks: _filteredTasks,
+                                  onToggleStatus: _toggleTaskStatus,
+                                  onEdit: (task) => _addOrEditTask(task: task),
+                                  onDelete: _deleteTask,
+                                ),
+                    loading:
+                        () => const Center(child: CircularProgressIndicator()),
+                    error:
+                        (error, stackTrace) =>
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('Error: ${error.toString()}'),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _triggerTaskLoading,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                  ),
             ),
           ),
         ],

@@ -2,24 +2,39 @@ import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'package:smart_task_manager/core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_task_manager/main.dart';
 
-class NotificationTestScreen extends StatefulWidget {
+// Import with alias to resolve the name conflict
+import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
+
+class NotificationTestScreen extends ConsumerStatefulWidget {
   const NotificationTestScreen({super.key});
 
   @override
-  State<NotificationTestScreen> createState() => _NotificationTestScreenState();
+  ConsumerState<NotificationTestScreen> createState() => _NotificationTestScreenState();
 }
 
-class _NotificationTestScreenState extends State<NotificationTestScreen> {
+class _NotificationTestScreenState extends ConsumerState<NotificationTestScreen> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
       FlutterLocalNotificationsPlugin();
   bool _notificationsEnabled = false;
   bool _exactAlarmsEnabled = false;
   String _statusMessage = 'Checking notification permissions...';
+  late NotificationService _notificationService;
 
   @override
   void initState() {
     super.initState();
+    // We'll get the notification service in didChangeDependencies
+    _statusMessage = 'Initializing...';
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get the notification service from the provider
+    _notificationService = ref.read(notificationServiceProvider);
     _checkPermissions();
   }
 
@@ -32,7 +47,8 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
 
   Future<void> _checkExactAlarmPermission() async {
     try {
-      final hasExactAlarms = await NotificationService.checkExactAlarmPermission();
+      // Use the notification service's method to check exact alarm permissions
+      final hasExactAlarms = await _notificationService.checkExactAlarmPermission();
       setState(() {
         _exactAlarmsEnabled = hasExactAlarms;
         _updateStatusMessage();
@@ -92,19 +108,9 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
 
   Future<void> _requestPermissions() async {
     try {
-      if (Platform.isAndroid) {
-        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-            flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        
-        await androidImplementation?.requestNotificationsPermission();
-        await androidImplementation?.requestExactAlarmsPermission();
-        
-        // Check if permissions were granted
-        await _checkPermissions();
-      } else if (Platform.isIOS) {
-        await _checkNotificationPermission(); // This will request permissions on iOS
-      }
+      await _notificationService.requestPermissions();
+      // Check if permissions were granted
+      await _checkPermissions();
     } catch (e) {
       setState(() {
         _statusMessage = 'Error requesting permissions: $e';
@@ -144,7 +150,7 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
-                  await NotificationService.showNotification(
+                  await _notificationService.showNotification(
                     id: 0,
                     title: 'Immediate Notification',
                     body: 'This is a test notification that shows immediately',
@@ -171,11 +177,11 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
                   final scheduledTime = DateTime.now().add(const Duration(seconds: 5));
                   debugPrint('Scheduling notification for: $scheduledTime');
                   
-                  await NotificationService.scheduleNotification(
+                  await _notificationService.scheduleNotification(
                     id: 1,
                     title: 'Scheduled Notification',
                     body: 'This notification was scheduled to appear 5 seconds later',
-                    dateTime: scheduledTime,
+                    scheduledDate: scheduledTime,
                   );
                   
                   if (mounted) {
@@ -198,8 +204,8 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
-                  await NotificationService.cancel(0);
-                  await NotificationService.cancel(1);
+                  // Cancel notifications with IDs 0 and 1
+                  await _notificationService.cancelAll();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('All notifications cancelled')),
@@ -225,8 +231,8 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
                     'direct_test_channel',
                     'Direct Test Notifications',
                     channelDescription: 'For directly testing notifications',
-                    importance: Importance.max,
-                    priority: Priority.high,
+                    importance: fln.Importance.max,
+                    priority: fln.Priority.high,
                   );
                   
                   const NotificationDetails details =

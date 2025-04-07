@@ -3,13 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_task_manager/core/services/notification_service.dart';
 import 'package:smart_task_manager/data/models/task.dart';
 import 'package:flutter/foundation.dart';
+import 'package:smart_task_manager/main.dart';
 
 /// Repository for managing tasks in Firestore and related notifications
 class TaskRepository {
   final FirebaseFirestore firestore;
+  final NotificationService notificationService;
   static const String collectionName = 'tasks';
 
-  TaskRepository(this.firestore);
+  TaskRepository(this.firestore, this.notificationService);
 
   CollectionReference get _taskCollection => firestore.collection(collectionName);
 
@@ -43,7 +45,7 @@ class TaskRepository {
       debugPrint('TaskRepository: Task updated successfully');
       
       // Cancel existing notification and reschedule
-      await NotificationService.cancel(task.id.hashCode);
+      await notificationService.cancelTaskReminders(task.id);
       await _scheduleTaskNotification(task);
     } catch (e) {
       debugPrint('TaskRepository: Error updating task: $e');
@@ -65,7 +67,7 @@ class TaskRepository {
       debugPrint('TaskRepository: Task deleted successfully');
       
       // Cancel any existing notification for this task
-      await NotificationService.cancel(taskId.hashCode);
+      await notificationService.cancelTaskReminders(taskId);
     } catch (e) {
       debugPrint('TaskRepository: Error deleting task: $e');
       throw _handleException('Error deleting task', e);
@@ -102,12 +104,7 @@ class TaskRepository {
       // Only schedule notifications for tasks with future due dates
       if (task.dueDate.isAfter(DateTime.now())) {
         debugPrint('TaskRepository: Scheduling notification for task: ${task.title}');
-        await NotificationService.scheduleNotification(
-          id: task.id.hashCode,
-          title: 'Reminder: ${task.title}',
-          body: task.description ?? 'You have a task due!',
-          dateTime: task.dueDate,
-        );
+        await notificationService.scheduleTaskReminder(task);
         debugPrint('TaskRepository: Notification scheduled successfully');
       }
     } catch (e) {
@@ -128,5 +125,6 @@ class TaskRepository {
 
 /// Provider for TaskRepository using Riverpod
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
-  return TaskRepository(FirebaseFirestore.instance);
+  final notificationService = ref.watch(notificationServiceProvider);
+  return TaskRepository(FirebaseFirestore.instance, notificationService);
 });

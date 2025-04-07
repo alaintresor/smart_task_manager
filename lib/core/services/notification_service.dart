@@ -1,15 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:smart_task_manager/data/models/task.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'dart:io' show Platform;
-import 'package:flutter/material.dart';
+
+// Import with alias to resolve the name conflict
+import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
 
 class NotificationService {
-  static final _notifications = FlutterLocalNotificationsPlugin();
-  static bool _initialized = false;
+  final FlutterLocalNotificationsPlugin notificationsPlugin;
+  bool _initialized = false;
 
-  static Future<void> init() async {
+  NotificationService({required this.notificationsPlugin});
+
+  Future<void> initialize() async {
     if (_initialized) {
       debugPrint('NotificationService already initialized');
       return;
@@ -17,50 +22,52 @@ class NotificationService {
     
     try {
       debugPrint('Initializing notification service...');
+      
+      // Initialize timezone data
       tz.initializeTimeZones();
       // Use local timezone instead of UTC for better scheduling accuracy
       try {
-        tz.setLocalLocation(tz.getLocation('America/New_York')); // You should replace this with dynamic timezone detection
+        // You should replace this with dynamic timezone detection for production
+        tz.setLocalLocation(tz.getLocation('America/New_York')); 
       } catch (e) {
         // Fallback to UTC if local timezone is not available
         tz.setLocalLocation(tz.getLocation('UTC'));
+        debugPrint('Failed to set local timezone: $e');
       }
 
-      final androidSettings = const AndroidInitializationSettings('@mipmap/ic_launcher');
-      final iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      
+      final DarwinInitializationSettings initializationSettingsIOS =
+          DarwinInitializationSettings(
         requestSoundPermission: false,
-        onDidReceiveLocalNotification: (id, title, body, payload) async {
-          debugPrint('Received iOS notification: $id, $title, $body, $payload');
-        },
+        requestBadgePermission: false,
+        requestAlertPermission: false,
+        onDidReceiveLocalNotification: onDidReceiveLocalNotification,
       );
-
-      if(kIsWeb){
-        // Web-specific initialization
-    
+      
+      if (kIsWeb) {
+        // Web-specific initialization if needed
+        _initialized = true;
         return;
       }
       
-      final initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-        
+      final InitializationSettings initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsIOS,
       );
-
+      
       // Set initialization flag before actual initialization to prevent race conditions
       _initialized = true;
-
-      await _notifications.initialize(
-        initSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse response) {
-          debugPrint('Notification clicked: ${response.payload}');
-        },
+      
+      await notificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
       );
       
       debugPrint('Notification service initialized successfully');
       
-      // Check and request permissions
+      // Check and request permissions based on platform
       if (Platform.isAndroid) {
         await _requestAndroidPermissions();
       } else if (Platform.isIOS) {
@@ -70,14 +77,14 @@ class NotificationService {
       // Reset initialization flag if initialization fails
       _initialized = false;
       debugPrint('Error initializing notification service: $e');
-      rethrow;
+      // Don't rethrow to prevent app crashes
     }
   }
 
-  static Future<void> _requestAndroidPermissions() async {
+  Future<void> _requestAndroidPermissions() async {
     try {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _notifications.resolvePlatformSpecificImplementation<
+          notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
               
       if (androidImplementation != null) {
@@ -96,16 +103,15 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error requesting Android permissions: $e');
       // Don't rethrow here to prevent app crashes during permission request
-      // Instead, log the error and continue
     }
   }
 
-  static Future<bool> checkExactAlarmPermission() async {
+  Future<bool> checkExactAlarmPermission() async {
     if (!Platform.isAndroid) return true;
     
     try {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _notifications.resolvePlatformSpecificImplementation<
+          notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
               
       if (androidImplementation != null) {
@@ -118,10 +124,10 @@ class NotificationService {
     return false;
   }
   
-  static Future<void> _requestIOSPermissions() async {
+  Future<void> _requestIOSPermissions() async {
     try {
       final IOSFlutterLocalNotificationsPlugin? iosImplementation =
-          _notifications.resolvePlatformSpecificImplementation<
+          notificationsPlugin.resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>();
               
       if (iosImplementation != null) {
@@ -138,54 +144,75 @@ class NotificationService {
     }
   }
 
-  static Future<void> showNotification({
-    required int id,
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
+  Future<void> requestPermissions() async {
     if (!_initialized) {
       debugPrint('NotificationService not initialized, initializing now...');
-      await init();
+      await initialize();
+    }
+    
+    if (Platform.isAndroid) {
+      await _requestAndroidPermissions();
+    } else if (Platform.isIOS) {
+      await _requestIOSPermissions();
+    }
+  }
+
+  Future<void> scheduleTaskReminder(Task task) async {
+    if (!_initialized) {
+      debugPrint('NotificationService not initialized, initializing now...');
+      await initialize();
     }
     
     try {
-      debugPrint('Showing notification: $id, $title, $body');
-      
-      const androidDetails = AndroidNotificationDetails(
-        'task_channel',
-        'Task Reminders',
-        channelDescription: 'Reminder notifications for tasks',
-        importance: Importance.max,
-        priority: Priority.high,
-        playSound: true,
-      );
-      
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-      
-      const details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      await _notifications.show(id, title, body, details, payload: payload);
-      debugPrint('Notification shown successfully');
+      if (task.dueDate.isAfter(DateTime.now())) {
+        // Schedule for 1 hour before due date
+        final scheduleTime = task.dueDate.subtract(const Duration(hours: 1));
+        
+        if (scheduleTime.isAfter(DateTime.now())) {
+          await scheduleNotification(
+            id: task.id.hashCode,
+            title: 'Task Reminder',
+            body: 'Your task "${task.title}" is due in 1 hour',
+            scheduledDate: scheduleTime,
+            payload: task.id,
+          );
+          debugPrint('Scheduled 1-hour reminder for task ${task.id}');
+        }
+        
+        // Schedule for due time
+        await scheduleNotification(
+          id: task.id.hashCode + 1,
+          title: 'Task Due',
+          body: 'Your task "${task.title}" is due now',
+          scheduledDate: task.dueDate,
+          payload: task.id,
+        );
+        debugPrint('Scheduled due time notification for task ${task.id}');
+      }
     } catch (e) {
-      debugPrint('Error showing notification: $e');
+      debugPrint('Error scheduling task reminders: $e');
       // Log error but don't rethrow to prevent app crashes
     }
   }
 
-  static Future<List<PendingNotificationRequest>> checkPendingNotifications() async {
+  Future<void> cancelTaskReminders(String taskId) async {
+    try {
+      debugPrint('Cancelling reminders for task $taskId');
+      await notificationsPlugin.cancel(taskId.hashCode);
+      await notificationsPlugin.cancel(taskId.hashCode + 1);
+      debugPrint('Canceled reminders for task $taskId');
+    } catch (e) {
+      debugPrint('Error cancelling task reminders: $e');
+      // Log error but don't rethrow to prevent app crashes
+    }
+  }
+
+  Future<List<PendingNotificationRequest>> checkPendingNotifications() async {
     try {
       if (!_initialized) {
-        await init();
+        await initialize();
       }
-      final pendingNotifications = await _notifications.pendingNotificationRequests();
+      final pendingNotifications = await notificationsPlugin.pendingNotificationRequests();
       debugPrint('Pending notifications: ${pendingNotifications.length}');
       for (var notification in pendingNotifications) {
         debugPrint('Pending notification: id=${notification.id}, title=${notification.title}, body=${notification.body}');
@@ -197,26 +224,77 @@ class NotificationService {
     }
   }
 
-  static Future<void> scheduleNotification({
+  Future<void> showNotification({
     required int id,
     required String title,
     required String body,
-    required DateTime dateTime,
     String? payload,
   }) async {
     if (!_initialized) {
       debugPrint('NotificationService not initialized, initializing now...');
-      await init();
+      await initialize();
     }
     
     try {
-      debugPrint('Scheduling notification: $id, $title, $body at $dateTime');
+      debugPrint('Showing notification: $id, $title, $body');
+      
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+        'task_reminders',
+        'Task Reminders',
+        channelDescription: 'Notifications for task reminders',
+        importance: fln.Importance.max,
+        priority: fln.Priority.high,
+        playSound: true,
+        enableLights: true,
+      );
+      
+      const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+          DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iOSPlatformChannelSpecifics,
+      );
+      
+      await notificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+      debugPrint('Notification shown successfully');
+    } catch (e) {
+      debugPrint('Error showing notification: $e');
+      // Log error but don't rethrow to prevent app crashes
+    }
+  }
+
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+    String? payload,
+  }) async {
+    if (!_initialized) {
+      debugPrint('NotificationService not initialized, initializing now...');
+      await initialize();
+    }
+    
+    try {
+      debugPrint('Scheduling notification: $id, $title, $body at $scheduledDate');
       
       // Ensure the scheduled time is in the future
       final now = DateTime.now();
-      if (dateTime.isBefore(now)) {
+      if (scheduledDate.isBefore(now)) {
         debugPrint('Warning: Scheduled time is in the past, adjusting to now + 5 seconds');
-        dateTime = now.add(const Duration(seconds: 5));
+        scheduledDate = now.add(const Duration(seconds: 5));
       }
       
       // Check if we have exact alarm permission on Android
@@ -225,7 +303,7 @@ class NotificationService {
         if (!hasExactAlarms) {
           debugPrint('Exact alarms not available, requesting permission...');
           final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-              _notifications.resolvePlatformSpecificImplementation<
+              notificationsPlugin.resolvePlatformSpecificImplementation<
                   AndroidFlutterLocalNotificationsPlugin>();
           if (androidImplementation != null) {
             await androidImplementation.requestExactAlarmsPermission();
@@ -233,43 +311,45 @@ class NotificationService {
         }
       }
       
-      final androidDetails = const AndroidNotificationDetails(
-        'task_channel',
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+        'task_reminders',
         'Task Reminders',
-        channelDescription: 'Reminder notifications for tasks',
-        importance: Importance.max,
-        priority: Priority.high,
+        channelDescription: 'Notifications for task reminders',
+        importance: fln.Importance.max,
+        priority: fln.Priority.high,
         playSound: true,
         enableLights: true,
         fullScreenIntent: true,
       );
       
-      const iosDetails = DarwinNotificationDetails(
+      const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+          DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
       );
       
-      final details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iOSPlatformChannelSpecifics,
       );
-
+      
       // Get current timezone
-      tz.TZDateTime scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
-      debugPrint('Scheduling for: $scheduledDate');
+      tz.TZDateTime scheduledTzDate = tz.TZDateTime.from(scheduledDate, tz.local);
+      debugPrint('Scheduling for: $scheduledTzDate');
       
       // Calculate seconds from now
-      final int secondsFromNow = dateTime.difference(now).inSeconds;
+      final int secondsFromNow = scheduledDate.difference(now).inSeconds;
       debugPrint('Scheduling notification in $secondsFromNow seconds from now');
       
       // Use zonedSchedule with the correctly formatted TZDateTime
-      await _notifications.zonedSchedule(
+      await notificationsPlugin.zonedSchedule(
         id,
         title,
         body,
-        scheduledDate,
-        details,
+        scheduledTzDate,
+        platformChannelSpecifics,
         androidAllowWhileIdle: true, // Allow notification when device is in low-power idle modes
         uiLocalNotificationDateInterpretation: 
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -290,24 +370,33 @@ class NotificationService {
     }
   }
 
-  static Future<void> cancel(int id) async {
+  Future<void> cancelAll() async {
     try {
-      debugPrint('Cancelling notification: $id');
-      await _notifications.cancel(id);
-      debugPrint('Notification cancelled successfully');
+      debugPrint('Cancelling all notifications');
+      await notificationsPlugin.cancelAll();
+      debugPrint('All notifications cancelled successfully');
     } catch (e) {
-      debugPrint('Error cancelling notification: $e');
+      debugPrint('Error cancelling all notifications: $e');
       // Log error but don't rethrow to prevent app crashes
     }
   }
 
-  static Future<void> cancelAll() async {
-    try {
-      debugPrint('Cancelling all notifications');
-      await _notifications.cancelAll();
-      debugPrint('All notifications cancelled successfully');
-    } catch (e) {
-      debugPrint('Error cancelling all notifications: $e');
+  void onDidReceiveLocalNotification(
+      int id, String? title, String? body, String? payload) {
+    // Handle iOS notification when app is in foreground
+    debugPrint('Received iOS notification: $id, $title, $body, $payload');
+    // Here you could add code to show a custom dialog or in-app notification
+  }
+
+  void onDidReceiveNotificationResponse(NotificationResponse response) {
+    // Handle notification tap
+    final String? payload = response.payload;
+    debugPrint('Notification clicked: ${response.payload}');
+    
+    if (payload != null) {
+      // Navigate to specific task details
+      // You would typically use a navigation service or similar to navigate
+      // to the task details page with the task ID from the payload
     }
   }
 }

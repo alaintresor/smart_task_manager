@@ -9,10 +9,16 @@ import 'package:smart_task_manager/presentation/screens/login_screen.dart';
 import 'package:smart_task_manager/presentation/screens/notification_test_screen.dart';
 import 'package:smart_task_manager/presentation/screens/signup_screen.dart';
 import 'package:smart_task_manager/presentation/screens/task_screen.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 // import 'package:workmanager/workmanager.dart';
 
 // Global navigator key to access context from outside of build
 final globalNavigatorKey = GlobalKey<NavigatorState>();
+
+// Create a provider for the NotificationService
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  return NotificationService(notificationsPlugin: FlutterLocalNotificationsPlugin());
+});
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +28,10 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final savedThemeMode = prefs.getString('themeMode') ?? 'system';
 
-  await NotificationService.init();
+  // Initialize notification service
+  final notificationsPlugin = FlutterLocalNotificationsPlugin();
+  final notificationService = NotificationService(notificationsPlugin: notificationsPlugin);
+  await notificationService.initialize();
 
   // Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
@@ -36,6 +45,10 @@ void main() async {
 
   runApp(
     ProviderScope(
+      overrides: [
+        // Override the notificationServiceProvider with our initialized instance
+        notificationServiceProvider.overrideWithValue(notificationService),
+      ],
       child: MyApp(initialThemeMode: _stringToThemeMode(savedThemeMode)),
     ),
   );
