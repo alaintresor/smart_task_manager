@@ -47,5 +47,16 @@
 	<true/>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>We need to send you task reminders and notifications about your tasks</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1092400608704-nbbiieko3tfkkv419q0m0cj353k0fqv8</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
