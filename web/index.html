@@ -31,8 +31,26 @@
 
   <title>smart_task_manager</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+  <!-- Firebase Configuration -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC7cq-oHq39fX9Pqv8IQEVdR1c88qW3q9Q",
+      authDomain: "test-5d050.firebaseapp.com",
+      projectId: "test-5d050",
+      storageBucket: "test-5d050.firebasestorage.app",
+      messagingSenderId: "1092400608704",
+      appId: "1:1092400608704:web:4179a29118fb9287820425",
+      measurementId: "G-K3RGQMG7EL"
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

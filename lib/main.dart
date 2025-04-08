@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:smart_task_manager/core/services/background_service.dart';
 import 'package:smart_task_manager/core/services/firebase_service.dart';
 import 'package:smart_task_manager/core/services/notification_service.dart';
 import 'package:smart_task_manager/data/providers/auth_provider.dart';
 import 'package:smart_task_manager/presentation/screens/login_screen.dart';
-import 'package:smart_task_manager/presentation/screens/notification_test_screen.dart';
 import 'package:smart_task_manager/presentation/screens/signup_screen.dart';
 import 'package:smart_task_manager/presentation/screens/task_screen.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-// import 'package:workmanager/workmanager.dart';
 
 // Global navigator key to access context from outside of build
 final globalNavigatorKey = GlobalKey<NavigatorState>();
@@ -32,16 +29,6 @@ void main() async {
   final notificationsPlugin = FlutterLocalNotificationsPlugin();
   final notificationService = NotificationService(notificationsPlugin: notificationsPlugin);
   await notificationService.initialize();
-
-  // Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
-
-  // // Run every 15 mins (min allowed on Android)
-  // Workmanager().registerPeriodicTask(
-  //   'check-tasks-periodic',
-  //   checkTasksBackgroundTask,
-  //   frequency: const Duration(minutes: 15),
-  //   constraints: Constraints(networkType: NetworkType.connected),
-  // );
 
   runApp(
     ProviderScope(
@@ -236,7 +223,6 @@ class _MyAppState extends ConsumerState<MyApp> {
               currentThemeMode: _themeMode,
               onLogout: _handleLogout,
             ),
-        '/notification_test': (context) => const NotificationTestScreen(),
       },
     );
   }
